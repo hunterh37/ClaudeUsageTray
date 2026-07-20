@@ -39,6 +39,8 @@ struct AccountInfo: Codable, Identifiable, Equatable {
     var weeklyLimitTokens: Int64 = 0
     /// Which metric limits are compared against
     var useBillableMetric: Bool = true
+    /// User-chosen notch line color as "#RRGGBB" (nil = use palette default)
+    var colorHex: String? = nil
 
     var id: String { uuid }
     var shortName: String {
@@ -81,6 +83,16 @@ enum TierDefaults {
         if t.contains("max_5x")  { return 460_000_000 }
         if t.contains("pro")     { return 100_000_000 }
         return 0
+    }
+}
+
+/// Default per-account colors for the notch gauge, assigned by account order
+/// until the user overrides one.
+enum AccountPalette {
+    static let hexes = ["#30D0C0", "#5E5CE6", "#FF9F0A", "#FF375F",
+                        "#32D74B", "#FFD60A", "#BF5AF2", "#64D2FF"]
+    static func defaultHex(_ index: Int) -> String {
+        hexes[((index % hexes.count) + hexes.count) % hexes.count]
     }
 }
 

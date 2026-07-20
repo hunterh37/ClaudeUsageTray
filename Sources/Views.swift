@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var engine: UsageEngine
+    @EnvironmentObject var notch: NotchController
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -22,13 +23,21 @@ struct ContentView: View {
             } else {
                 ScrollView {
                     VStack(spacing: 10) {
-                        ForEach(engine.snapshots) { snap in
-                            AccountCard(snap: snap)
+                        ForEach(Array(engine.snapshots.enumerated()), id: \.element.id) { i, snap in
+                            AccountCard(snap: snap, index: i)
                         }
                     }
                 }
                 .frame(maxHeight: 480)
             }
+
+            Divider()
+            Toggle(isOn: $notch.enabled) {
+                Label("Wrap 5-hour gauge around the notch", systemImage: "sparkles")
+                    .font(.caption)
+            }
+            .toggleStyle(.switch)
+            .controlSize(.small)
 
             Divider()
             HStack {
@@ -48,17 +57,29 @@ struct ContentView: View {
 
 struct AccountCard: View {
     @EnvironmentObject var engine: UsageEngine
+    @EnvironmentObject var notch: NotchController
     let snap: UsageEngine.AccountSnapshot
+    let index: Int
     @State private var editingLimits = false
     @State private var fiveHText = ""
     @State private var weekText = ""
+
+    private var accountColor: Binding<Color> {
+        Binding(
+            get: { Color(hex: snap.info.colorHex ?? AccountPalette.defaultHex(index)) },
+            set: { newColor in
+                engine.updateAccount(snap.info.uuid) { $0.colorHex = newColor.hexString }
+            }
+        )
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Circle()
-                    .fill(snap.isCurrent ? Color.green : Color.gray.opacity(0.4))
-                    .frame(width: 8, height: 8)
+                    .fill(accountColor.wrappedValue)
+                    .frame(width: 9, height: 9)
+                    .overlay(Circle().stroke(snap.isCurrent ? Color.primary.opacity(0.5) : .clear, lineWidth: 1.5))
                 VStack(alignment: .leading, spacing: 0) {
                     Text(snap.info.shortName).font(.subheadline.weight(.semibold))
                     Text(snap.info.email).font(.caption2).foregroundStyle(.secondary)
@@ -101,6 +122,15 @@ struct AccountCard: View {
                         TextField("M tokens", text: $weekText).textFieldStyle(.roundedBorder).font(.caption)
                         Text("M").font(.caption2).foregroundStyle(.secondary)
                     }
+                    HStack {
+                        Text("Notch color").font(.caption).frame(width: 60, alignment: .leading)
+                        ColorPicker("", selection: accountColor, supportsOpacity: false)
+                            .labelsHidden()
+                        Button("Reset") {
+                            engine.updateAccount(snap.info.uuid) { $0.colorHex = nil }
+                        }.controlSize(.small).font(.caption2)
+                        Spacer()
+                    }
                     Toggle("Cost-weight cache reads (0.1x) — matches Claude Code", isOn: Binding(
                         get: { snap.info.useBillableMetric },
                         set: { v in engine.updateAccount(snap.info.uuid) { $0.useBillableMetric = v } }
@@ -133,6 +163,15 @@ struct AccountCard: View {
          .replacingOccurrences(of: "claude_", with: "")
          .replacingOccurrences(of: "_", with: " ")
     }
+}
+
+extension Color {
+    /// Build from "#RRGGBB"; falls back to gray on malformed input.
+    init(hex: String) {
+        if let ns = NSColor(hex: hex) { self.init(nsColor: ns) } else { self.init(.gray) }
+    }
+    /// "#RRGGBB" for persistence.
+    var hexString: String { NSColor(self).hexString }
 }
 
 struct WindowGauge: View {

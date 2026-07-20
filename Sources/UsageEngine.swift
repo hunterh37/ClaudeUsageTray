@@ -6,6 +6,8 @@ import Combine
 /// computes 5-hour + weekly usage windows.
 final class UsageEngine: ObservableObject {
 
+    static let shared = UsageEngine()
+
     // Published snapshot for the UI
     struct AccountSnapshot: Identifiable {
         var info: AccountInfo
