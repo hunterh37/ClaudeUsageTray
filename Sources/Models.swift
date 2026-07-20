@@ -41,6 +41,41 @@ struct AccountInfo: Codable, Identifiable, Equatable {
         if let d = displayName, !d.isEmpty { return d }
         return email.components(separatedBy: "@").first ?? email
     }
+
+    /// 5h limit to gauge against: user value if set, else a tier estimate.
+    var effectiveFiveHourLimit: Int64 {
+        fiveHourLimitTokens > 0 ? fiveHourLimitTokens : TierDefaults.fiveHour(rateLimitTier)
+    }
+    /// Weekly limit to gauge against: user value if set, else a tier estimate.
+    var effectiveWeeklyLimit: Int64 {
+        weeklyLimitTokens > 0 ? weeklyLimitTokens : TierDefaults.weekly(rateLimitTier)
+    }
+    /// True when the effective 5h limit came from a tier estimate, not a user value.
+    var fiveHourLimitIsEstimate: Bool { fiveHourLimitTokens <= 0 && effectiveFiveHourLimit > 0 }
+    var weeklyLimitIsEstimate: Bool { weeklyLimitTokens <= 0 && effectiveWeeklyLimit > 0 }
+}
+
+/// Rough per-tier token windows. Anthropic does not publish exact token
+/// limits, so these are estimates meant only to render a progress bar; users
+/// can override per account. 0 = unknown tier (bar stays empty).
+enum TierDefaults {
+    private static func normalized(_ tier: String?) -> String {
+        (tier ?? "").lowercased()
+    }
+    static func fiveHour(_ tier: String?) -> Int64 {
+        let t = normalized(tier)
+        if t.contains("max_20x") { return 88_000_000 }
+        if t.contains("max_5x")  { return 44_000_000 }
+        if t.contains("pro")     { return 19_000_000 }
+        return 0
+    }
+    static func weekly(_ tier: String?) -> Int64 {
+        let t = normalized(tier)
+        if t.contains("max_20x") { return 1_760_000_000 }
+        if t.contains("max_5x")  { return 880_000_000 }
+        if t.contains("pro")     { return 380_000_000 }
+        return 0
+    }
 }
 
 /// Records when the logged-in account changed, so usage can be

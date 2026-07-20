@@ -1,34 +1,67 @@
 # ClaudeUsageTray
 
-Native macOS menu-bar app that tracks Claude Code token usage across **all your Claude accounts**, live.
+A native macOS menu-bar app that tracks [Claude Code](https://claude.com/claude-code) token usage across all of your Claude accounts, live.
 
-## What it does
+[![Platform](https://img.shields.io/badge/platform-macOS%2014%2B-blue.svg)](https://www.apple.com/macos/)
+[![Swift](https://img.shields.io/badge/swift-5.9-orange.svg)](https://swift.org)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-- **Live token tracking** — tails every transcript in `~/.claude/projects/**/*.jsonl` incrementally (file cursors, dedup by message+request id) and increments usage as you work. Rescans every 10 s.
-- **Automatic account detection** — watches `oauthAccount` in `~/.claude.json`. The moment you `/login` to a different account, a switch event is recorded and all subsequent usage is attributed to the new account. Every account ever seen gets its own card.
-- **Claude-style windows per account**:
-  - **5-hour window** — anchored at your first message after the previous window expired, just like Claude's real session limits, with a "resets in Xh Ym" countdown.
-  - **Weekly window** — 7-day anchored window with countdown.
-- **Per-account limits** — each account can have its own 5-hour and weekly token limits (in millions of tokens, editable via the slider icon on each card). Gauges go orange at 60 %, red at 85 %.
-- **Metric choice** — limits compare against `input + output + cache_creation` by default (cache reads are far cheaper against real limits); toggle per account to count everything. The in/out/cached breakdown is always shown.
-- Menu-bar title shows the current account and its 5-hour usage (% if a limit is set, raw tokens otherwise).
+## Features
 
-## Install / update
+- **Live token tracking** — incrementally tails every transcript in `~/.claude/projects/**/*.jsonl` and updates usage as you work (rescans every 10s).
+- **Automatic account detection** — watches `oauthAccount` in `~/.claude.json`; the moment you `/login` to a different account, usage is attributed to it. Every account gets its own card.
+- **Claude-style windows** — a rolling 5-hour session window and a 7-day weekly window per account, each with a live "resets in" countdown.
+- **Per-account limits** — set your own 5-hour and weekly token ceilings per account. Gauges turn orange at 60% and red at 85%.
+- **Metric choice** — compares against `input + output + cache_creation` by default (cache reads are cheaper against real limits); toggle per account to count everything.
+
+## Requirements
+
+- macOS 14 (Sonoma) or later
+- [Swift toolchain](https://swift.org/download/) (bundled with Xcode or the Command Line Tools)
+
+## Install
 
 ```bash
+git clone https://github.com/hunterh37/ClaudeUsageTray.git
+cd ClaudeUsageTray
 ./install.sh
 ```
 
-Builds with SwiftPM, installs `/Applications/ClaudeUsageTray.app` (menu-bar only, no Dock icon), ad-hoc signs it, adds a LaunchAgent so it starts at login, and launches it.
+This builds with SwiftPM, installs `/Applications/ClaudeUsageTray.app` (menu-bar only, no Dock icon), ad-hoc signs it, adds a LaunchAgent so it starts at login, and launches it. Re-run `./install.sh` to update.
 
-## Data
+## Uninstall
 
-State lives at `~/Library/Application Support/ClaudeUsageTray/state.json`
-(accounts, switch timeline, 5-minute usage buckets for the last 9 days, file cursors).
-Delete it to reset; history will re-scan and attribute to the currently logged-in account.
+```bash
+pkill -x ClaudeUsageTray
+rm -rf /Applications/ClaudeUsageTray.app \
+       ~/Library/LaunchAgents/io.medvr.claudeusagetray.plist \
+       ~/Library/Application\ Support/ClaudeUsageTray
+```
 
-## Notes / limits
+## Data & privacy
 
-- Usage that happened **before first launch** is attributed to the account logged in at first launch (transcripts don't record which account made each request — attribution is only exact from install time onward).
-- Anthropic doesn't publish exact token limits per plan; set the limit numbers on each card to whatever you observe your plan's ceilings to be.
-- Uninstall: `pkill -x ClaudeUsageTray; rm -rf /Applications/ClaudeUsageTray.app ~/Library/LaunchAgents/io.medvr.claudeusagetray.plist`
+All state is stored locally at `~/Library/Application Support/ClaudeUsageTray/state.json` (accounts, switch timeline, usage buckets, and file cursors). Nothing is sent anywhere. Delete the file to reset.
+
+## Notes & limitations
+
+- Usage before first launch is attributed to whichever account was logged in at first launch — transcripts don't record which account made each request, so attribution is exact only from install time onward.
+- Anthropic doesn't publish exact per-plan token limits; set the limit values on each card to match what you observe for your plan.
+
+## Contributing
+
+Contributions are welcome! Please open an issue to discuss significant changes, and see [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow.
+
+## License
+
+Released under the [MIT License](LICENSE).
+
+---
+
+<p align="center">
+  <a href="https://dicyaninlabs.com">
+    <img src="assets/dicyanin-labs-logo.png" alt="Dicyanin Labs" width="360">
+  </a>
+  <br>
+  <sub>Proudly maintained by <a href="https://dicyaninlabs.com">DicyaninLabs</a></sub>
+</p>

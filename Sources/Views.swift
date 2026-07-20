@@ -80,11 +80,13 @@ struct AccountCard: View {
 
             WindowGauge(label: "5-hour window",
                         window: snap.fiveHour,
-                        limit: snap.info.fiveHourLimitTokens,
+                        limit: snap.info.effectiveFiveHourLimit,
+                        isEstimate: snap.info.fiveHourLimitIsEstimate,
                         billable: snap.info.useBillableMetric)
             WindowGauge(label: "Weekly window",
                         window: snap.weekly,
-                        limit: snap.info.weeklyLimitTokens,
+                        limit: snap.info.effectiveWeeklyLimit,
+                        isEstimate: snap.info.weeklyLimitIsEstimate,
                         billable: snap.info.useBillableMetric)
 
             if editingLimits {
@@ -137,6 +139,7 @@ struct WindowGauge: View {
     let label: String
     let window: UsageWindow?
     let limit: Int64
+    var isEstimate: Bool = false
     let billable: Bool
 
     private var used: Int64 {
@@ -179,7 +182,7 @@ struct WindowGauge: View {
             .frame(height: 6)
             HStack {
                 Text(limit > 0
-                     ? "\(fmtTokens(used)) / \(fmtTokens(limit))  (\(Int(fraction * 100))%)"
+                     ? "\(fmtTokens(used)) / \(fmtTokens(limit))\(isEstimate ? " est." : "")  (\(Int(fraction * 100))%)"
                      : "\(fmtTokens(used)) used")
                     .font(.caption2.monospacedDigit())
                 Spacer()

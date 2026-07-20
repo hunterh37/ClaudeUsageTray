@@ -238,8 +238,8 @@ final class UsageEngine: ObservableObject {
         if let cur = snaps.first(where: { $0.isCurrent }) {
             let metricTotal = cur.fiveHour.map {
                 cur.info.useBillableMetric ? $0.counts.billable : $0.counts.total } ?? 0
-            if cur.info.fiveHourLimitTokens > 0 {
-                let pct = Int((Double(metricTotal) / Double(cur.info.fiveHourLimitTokens)) * 100)
+            if cur.info.effectiveFiveHourLimit > 0 {
+                let pct = Int((Double(metricTotal) / Double(cur.info.effectiveFiveHourLimit)) * 100)
                 title = "\(cur.info.shortName.prefix(8)) \(pct)%"
             } else {
                 title = "\(cur.info.shortName.prefix(8)) \(fmtTokens(metricTotal))"
