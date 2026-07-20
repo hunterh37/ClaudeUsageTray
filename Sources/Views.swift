@@ -101,7 +101,7 @@ struct AccountCard: View {
                         TextField("M tokens", text: $weekText).textFieldStyle(.roundedBorder).font(.caption)
                         Text("M").font(.caption2).foregroundStyle(.secondary)
                     }
-                    Toggle("Exclude cache reads from limit metric", isOn: Binding(
+                    Toggle("Cost-weight cache reads (0.1x) — matches Claude Code", isOn: Binding(
                         get: { snap.info.useBillableMetric },
                         set: { v in engine.updateAccount(snap.info.uuid) { $0.useBillableMetric = v } }
                     )).font(.caption2)
@@ -144,7 +144,7 @@ struct WindowGauge: View {
 
     private var used: Int64 {
         guard let w = window else { return 0 }
-        return billable ? w.counts.billable : w.counts.total
+        return billable ? w.counts.weighted : w.counts.total
     }
     private var fraction: Double {
         guard limit > 0 else { return 0 }

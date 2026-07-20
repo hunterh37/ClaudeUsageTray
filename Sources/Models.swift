@@ -9,8 +9,12 @@ struct TokenCounts: Codable, Equatable {
     var cacheRead: Int64 = 0
 
     var total: Int64 { input + output + cacheCreate + cacheRead }
-    /// Tokens excluding cache reads (cache reads are ~10x cheaper against limits)
+    /// Tokens excluding cache reads entirely.
     var billable: Int64 { input + output + cacheCreate }
+    /// Cost-weighted tokens: cache reads count at 0.1x (they are ~10x cheaper
+    /// and are discounted this way against rate limits), everything else 1x.
+    /// This mirrors how Claude Code reports 5h/weekly usage.
+    var weighted: Int64 { input + output + cacheCreate + cacheRead / 10 }
 
     static func + (l: TokenCounts, r: TokenCounts) -> TokenCounts {
         TokenCounts(input: l.input + r.input,
@@ -62,18 +66,20 @@ enum TierDefaults {
     private static func normalized(_ tier: String?) -> String {
         (tier ?? "").lowercased()
     }
+    // 5h limits in cost-weighted tokens (cache reads at 0.1x). max_5x is
+    // calibrated to an observed Claude Code reading (~4.2M weighted ≈ 18%).
     static func fiveHour(_ tier: String?) -> Int64 {
         let t = normalized(tier)
-        if t.contains("max_20x") { return 88_000_000 }
-        if t.contains("max_5x")  { return 44_000_000 }
-        if t.contains("pro")     { return 19_000_000 }
+        if t.contains("max_20x") { return 92_000_000 }
+        if t.contains("max_5x")  { return 23_000_000 }
+        if t.contains("pro")     { return 5_000_000 }
         return 0
     }
     static func weekly(_ tier: String?) -> Int64 {
         let t = normalized(tier)
-        if t.contains("max_20x") { return 1_760_000_000 }
-        if t.contains("max_5x")  { return 880_000_000 }
-        if t.contains("pro")     { return 380_000_000 }
+        if t.contains("max_20x") { return 1_840_000_000 }
+        if t.contains("max_5x")  { return 460_000_000 }
+        if t.contains("pro")     { return 100_000_000 }
         return 0
     }
 }
