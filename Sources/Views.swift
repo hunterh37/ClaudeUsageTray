@@ -1,0 +1,193 @@
+import SwiftUI
+
+struct ContentView: View {
+    @EnvironmentObject var engine: UsageEngine
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Claude Token Usage")
+                    .font(.headline)
+                Spacer()
+                if engine.scanning { ProgressView().controlSize(.small) }
+                Button { engine.rescanNow() } label: {
+                    Image(systemName: "arrow.clockwise")
+                }.buttonStyle(.borderless)
+            }
+
+            if engine.snapshots.isEmpty {
+                Text("Scanning ~/.claude transcripts…")
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 20)
+            } else {
+                ScrollView {
+                    VStack(spacing: 10) {
+                        ForEach(engine.snapshots) { snap in
+                            AccountCard(snap: snap)
+                        }
+                    }
+                }
+                .frame(maxHeight: 480)
+            }
+
+            Divider()
+            HStack {
+                if let t = engine.lastScan {
+                    Text("Updated \(t.formatted(date: .omitted, time: .shortened))")
+                        .font(.caption2).foregroundStyle(.tertiary)
+                }
+                Spacer()
+                Button("Quit") { NSApp.terminate(nil) }
+                    .font(.caption)
+            }
+        }
+        .padding(12)
+        .frame(width: 340)
+    }
+}
+
+struct AccountCard: View {
+    @EnvironmentObject var engine: UsageEngine
+    let snap: UsageEngine.AccountSnapshot
+    @State private var editingLimits = false
+    @State private var fiveHText = ""
+    @State private var weekText = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(snap.isCurrent ? Color.green : Color.gray.opacity(0.4))
+                    .frame(width: 8, height: 8)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(snap.info.shortName).font(.subheadline.weight(.semibold))
+                    Text(snap.info.email).font(.caption2).foregroundStyle(.secondary)
+                }
+                Spacer()
+                if let tier = snap.info.rateLimitTier {
+                    Text(tierLabel(tier))
+                        .font(.caption2)
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(.quaternary, in: Capsule())
+                }
+                Button {
+                    fiveHText = snap.info.fiveHourLimitTokens > 0 ? "\(snap.info.fiveHourLimitTokens / 1_000_000)" : ""
+                    weekText = snap.info.weeklyLimitTokens > 0 ? "\(snap.info.weeklyLimitTokens / 1_000_000)" : ""
+                    editingLimits.toggle()
+                } label: { Image(systemName: "slider.horizontal.3") }
+                .buttonStyle(.borderless)
+            }
+
+            WindowGauge(label: "5-hour window",
+                        window: snap.fiveHour,
+                        limit: snap.info.fiveHourLimitTokens,
+                        billable: snap.info.useBillableMetric)
+            WindowGauge(label: "Weekly window",
+                        window: snap.weekly,
+                        limit: snap.info.weeklyLimitTokens,
+                        billable: snap.info.useBillableMetric)
+
+            if editingLimits {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("5h limit").font(.caption).frame(width: 60, alignment: .leading)
+                        TextField("M tokens", text: $fiveHText).textFieldStyle(.roundedBorder).font(.caption)
+                        Text("M").font(.caption2).foregroundStyle(.secondary)
+                    }
+                    HStack {
+                        Text("Weekly").font(.caption).frame(width: 60, alignment: .leading)
+                        TextField("M tokens", text: $weekText).textFieldStyle(.roundedBorder).font(.caption)
+                        Text("M").font(.caption2).foregroundStyle(.secondary)
+                    }
+                    Toggle("Exclude cache reads from limit metric", isOn: Binding(
+                        get: { snap.info.useBillableMetric },
+                        set: { v in engine.updateAccount(snap.info.uuid) { $0.useBillableMetric = v } }
+                    )).font(.caption2)
+                    HStack {
+                        Spacer()
+                        Button("Save") {
+                            let fh = Int64(Double(fiveHText) ?? 0) * 1_000_000
+                            let wk = Int64(Double(weekText) ?? 0) * 1_000_000
+                            engine.updateAccount(snap.info.uuid) {
+                                $0.fiveHourLimitTokens = fh
+                                $0.weeklyLimitTokens = wk
+                            }
+                            editingLimits = false
+                        }.controlSize(.small)
+                    }
+                }
+                .padding(8)
+                .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
+            }
+        }
+        .padding(10)
+        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10)
+            .stroke(snap.isCurrent ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1))
+    }
+
+    private func tierLabel(_ t: String) -> String {
+        t.replacingOccurrences(of: "default_", with: "")
+         .replacingOccurrences(of: "claude_", with: "")
+         .replacingOccurrences(of: "_", with: " ")
+    }
+}
+
+struct WindowGauge: View {
+    let label: String
+    let window: UsageWindow?
+    let limit: Int64
+    let billable: Bool
+
+    private var used: Int64 {
+        guard let w = window else { return 0 }
+        return billable ? w.counts.billable : w.counts.total
+    }
+    private var fraction: Double {
+        guard limit > 0 else { return 0 }
+        return min(1.0, Double(used) / Double(limit))
+    }
+    private var barColor: Color {
+        switch fraction {
+        case 0.85...: return .red
+        case 0.6...:  return .orange
+        default:      return .accentColor
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack {
+                Text(label).font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                if let w = window {
+                    Text("resets in \(fmtCountdown(to: w.end))")
+                        .font(.caption2).foregroundStyle(.tertiary)
+                } else {
+                    Text("idle").font(.caption2).foregroundStyle(.tertiary)
+                }
+            }
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(.quaternary)
+                    if limit > 0 {
+                        Capsule().fill(barColor)
+                            .frame(width: max(3, geo.size.width * fraction))
+                    }
+                }
+            }
+            .frame(height: 6)
+            HStack {
+                Text(limit > 0
+                     ? "\(fmtTokens(used)) / \(fmtTokens(limit))  (\(Int(fraction * 100))%)"
+                     : "\(fmtTokens(used)) used")
+                    .font(.caption2.monospacedDigit())
+                Spacer()
+                if let w = window {
+                    Text("in \(fmtTokens(w.counts.input + w.counts.cacheCreate)) · out \(fmtTokens(w.counts.output)) · cached \(fmtTokens(w.counts.cacheRead))")
+                        .font(.caption2).foregroundStyle(.tertiary)
+                }
+            }
+        }
+    }
+}
