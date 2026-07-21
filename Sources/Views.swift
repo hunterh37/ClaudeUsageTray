@@ -85,7 +85,7 @@ struct AccountCard: View {
                     Text(snap.info.email).font(.caption2).foregroundStyle(.secondary)
                 }
                 Spacer()
-                if let tier = snap.info.rateLimitTier {
+                if let tier = snap.info.tierSignal {
                     Text(tierLabel(tier))
                         .font(.caption2)
                         .padding(.horizontal, 6).padding(.vertical, 2)

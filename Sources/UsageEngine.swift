@@ -90,6 +90,7 @@ final class UsageEngine: ObservableObject {
             existing.displayName = oa["displayName"] as? String ?? existing.displayName
             existing.organizationName = oa["organizationName"] as? String ?? existing.organizationName
             existing.rateLimitTier = oa["userRateLimitTier"] as? String ?? existing.rateLimitTier
+            existing.organizationType = oa["organizationType"] as? String ?? existing.organizationType
             state.accounts[uuid] = existing
         } else {
             state.accounts[uuid] = AccountInfo(
@@ -97,6 +98,7 @@ final class UsageEngine: ObservableObject {
                 displayName: oa["displayName"] as? String,
                 organizationName: oa["organizationName"] as? String,
                 rateLimitTier: oa["userRateLimitTier"] as? String,
+                organizationType: oa["organizationType"] as? String,
                 firstSeen: now, lastSeen: now)
         }
         if state.switches.last?.accountUuid != uuid {

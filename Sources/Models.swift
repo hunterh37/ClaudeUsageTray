@@ -31,6 +31,9 @@ struct AccountInfo: Codable, Identifiable, Equatable {
     var displayName: String?
     var organizationName: String?
     var rateLimitTier: String?
+    /// oauthAccount.organizationType (e.g. "claude_pro", "claude_team").
+    /// Pro accounts leave rateLimitTier nil, so this is the only tier signal.
+    var organizationType: String?
     var firstSeen: Date
     var lastSeen: Date
 
@@ -48,13 +51,21 @@ struct AccountInfo: Codable, Identifiable, Equatable {
         return email.components(separatedBy: "@").first ?? email
     }
 
+    /// Tier signal for estimates: prefer the explicit rate-limit tier (Max
+    /// plans), else fall back to organizationType (Pro plans report tier as nil
+    /// but set organizationType to "claude_pro").
+    var tierSignal: String? {
+        if let t = rateLimitTier, !t.isEmpty { return t }
+        return organizationType
+    }
+
     /// 5h limit to gauge against: user value if set, else a tier estimate.
     var effectiveFiveHourLimit: Int64 {
-        fiveHourLimitTokens > 0 ? fiveHourLimitTokens : TierDefaults.fiveHour(rateLimitTier)
+        fiveHourLimitTokens > 0 ? fiveHourLimitTokens : TierDefaults.fiveHour(tierSignal)
     }
     /// Weekly limit to gauge against: user value if set, else a tier estimate.
     var effectiveWeeklyLimit: Int64 {
-        weeklyLimitTokens > 0 ? weeklyLimitTokens : TierDefaults.weekly(rateLimitTier)
+        weeklyLimitTokens > 0 ? weeklyLimitTokens : TierDefaults.weekly(tierSignal)
     }
     /// True when the effective 5h limit came from a tier estimate, not a user value.
     var fiveHourLimitIsEstimate: Bool { fiveHourLimitTokens <= 0 && effectiveFiveHourLimit > 0 }
@@ -74,6 +85,7 @@ enum TierDefaults {
         let t = normalized(tier)
         if t.contains("max_20x") { return 92_000_000 }
         if t.contains("max_5x")  { return 23_000_000 }
+        // "claude_pro" (organizationType) or an explicit "pro" rate-limit tier.
         if t.contains("pro")     { return 5_000_000 }
         return 0
     }
